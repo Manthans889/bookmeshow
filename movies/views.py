@@ -12,7 +12,6 @@ from .models import Movie, Theater, Seat, Booking, Showtime, SeatReservation
 from django.core.mail import EmailMultiAlternatives
 from django.template.loader import render_to_string
 
-
 import json
 import hmac
 import hashlib
@@ -249,16 +248,15 @@ def verify_payment(request):
                 if not reservation:
                     continue
 
-                # prevent duplicate booking per seat
+                # trying : lets prevent duplicate booking for same payment
                 if Booking.objects.filter(seat=seat, showtime=showtime).exists():
-                    continue
-
+                  continue
                 Booking.objects.create(
                     user=request.user,
                     seat=seat,
                     showtime=showtime,
                     payment_id=payment_id,
-                    amount=showtime.price,  # ✅ use dynamic price
+                    amount=150,
                     status='confirmed'
                 )
 
@@ -267,12 +265,13 @@ def verify_payment(request):
 
                 booked.append(seat.seat_number)
 
-        except Exception as e:
-            print("BOOKING ERROR:", str(e))
+        except Exception:
             continue
 
-    # 📧 Send email only if something booked
+    
     if booked:
+        
+
         booking_data = {
             'user_email': request.user.email,
             'user_name': request.user.get_full_name() or request.user.username,
@@ -280,42 +279,15 @@ def verify_payment(request):
             'theater_name': showtime.theater.name,
             'showtime': showtime.start_time.strftime('%d %b %Y, %I:%M %p'),
             'seat_number': ', '.join(booked),
-            'amount': str(showtime.price * len(booked)),
+            'amount': str(150 * len(booked)),
             'payment_id': payment_id,
         }
-        # send_booking_confirmation.delay(booking_data) --- celery in render needs purchase tier , SO  fallback email
+
         try:
-            subject = f"Booking Confirmed — {booking_data['movie_name']}"
-
-            html_body = render_to_string(
-                'movies/emails/booking_confirmation.html',
-                {'booking': booking_data}
-            )
-
-            text_body = (
-                f"Hi {booking_data['user_name']}, your booking is confirmed!\n"
-                f"Movie: {booking_data['movie_name']}\n"
-                f"Theater: {booking_data['theater_name']}\n"
-                f"Show: {booking_data['showtime']}\n"
-                f"Seats: {booking_data['seat_number']}\n"
-                f"Amount: ₹{booking_data['amount']}\n"
-                f"Payment ID: {booking_data['payment_id']}\n"
-            )
-
-            email = EmailMultiAlternatives(
-                subject,
-                text_body,
-                settings.DEFAULT_FROM_EMAIL,
-                [booking_data['user_email']]
-            )
-
-            email.attach_alternative(html_body, 'text/html')
-            email.send(fail_silently=True)
-
-            print("EMAIL SENT")
-
+           send_booking_confirmation(booking_data)
         except Exception as e:
-            print("EMAIL ERROR:", str(e))
+           print("EMAIL ERROR:", str(e))
+        
 
     request.session.flush()
 
@@ -409,7 +381,31 @@ def payment_success(request):
             if not user.email:
               print("❌ User has no email:", user.username)
             else:
-             send_booking_confirmation.delay(booking_data)
+                
+                try:
+                    subject = f"Booking Confirmed — {booking_data['movie_name']}"
+                    html_body = render_to_string(
+                   'movies/emails/booking_confirmation.html',
+                    {'booking': booking_data}
+                  )
+                    text_body = (
+                    f"Hi {booking_data['user_name']}, your booking is confirmed!\n"
+                    f"Movie: {booking_data['movie_name']}\n"
+                    f"Theater: {booking_data['theater_name']}\n"
+                    f"Show: {booking_data['showtime']}\n"
+                    f"Seats: {booking_data['seat_number']}\n"
+                    f"Amount: ₹{booking_data['amount']}\n"
+                    f"Payment ID: {booking_data['payment_id']}\n"
+                  )
+                    msg = EmailMultiAlternatives(
+                    subject, text_body, settings.DEFAULT_FROM_EMAIL, [booking_data['user_email']]
+                    )
+                    msg.attach_alternative(html_body, 'text/html')
+                    msg.send(fail_silently=True)
+                    print("EMAIL SENT")
+                except Exception as e:
+                    print("EMAIL ERROR:", str(e))
+            
             
 
         return HttpResponse("Payment success ✅")
