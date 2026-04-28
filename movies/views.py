@@ -201,7 +201,7 @@ def create_order(request, showtime_id):
         'amount': total_amount,
         'key_id': settings.RAZORPAY_KEY_ID,
     })
-# -------------------- VERIFY PAYMENT --------------------
+# Check this again hmac causing error 
 @login_required(login_url='/login/')
 def verify_payment(request):
     if request.method != 'POST':
@@ -245,10 +245,9 @@ def verify_payment(request):
                 if not reservation:
                     continue
 
-                # prevent duplicate booking for same payment
-                if Booking.objects.filter(payment_id=payment_id, seat=seat).exists():
-                    continue
-
+                # trying : lets prevent duplicate booking for same payment
+                if Booking.objects.filter(seat=seat, showtime=showtime).exists():
+                  continue
                 Booking.objects.create(
                     user=request.user,
                     seat=seat,
@@ -339,8 +338,8 @@ def payment_success(request):
                     seat = Seat.objects.select_for_update().get(id=seat_id)
 
                     # prevent duplicate booking
-                    if Booking.objects.filter(payment_id=payment_id, seat=seat).exists():
-                        continue
+                    if Booking.objects.filter(seat=seat, showtime=showtime).exists():
+                       continue
 
                     Booking.objects.create(
                         user=user,
