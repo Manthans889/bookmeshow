@@ -12,12 +12,12 @@ def send_booking_confirmation(self, booking_data: dict):
     try:
         subject = f"Booking Confirmed — {booking_data['movie_name']}"
 
-        # Render HTML template
+        
         html_body = render_to_string(
             'movies/emails/booking_confirmation.html',
             {'booking': booking_data}
         )
-        # Plain text fallback
+     
         text_body = (
             f"Hi {booking_data['user_name']},\n\n"
             f"Your booking is confirmed!\n"
@@ -44,7 +44,7 @@ def send_booking_confirmation(self, booking_data: dict):
     except Exception as exc:
         logger.error("Email failed for payment %s: %s",
                      booking_data.get('payment_id'), str(exc))
-        raise self.retry(exc=exc)  #retry logic check this 
+        raise self.retry(exc=exc)  
     
     
 from celery import shared_task
